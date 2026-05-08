@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -33,6 +35,22 @@ class Task {
     this.isDone = false,
     required this.createdAt,
   });
+
+  // Convert Task to JSON
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'priority': priority,
+    'isDone': isDone,
+    'createdAt': createdAt,
+  };
+
+  // Convert JSON to Task
+  factory Task.fromJson(Map<String, dynamic> json) => Task(
+    title: json['title'],
+    priority: json['priority'],
+    isDone: json['isDone'],
+    createdAt: json['createdAt'],
+  );
 }
 
 class TodoHomePage extends StatefulWidget {
@@ -47,17 +65,47 @@ class _TodoHomePageState extends State<TodoHomePage> {
   final TextEditingController _controller = TextEditingController();
   String _selectedPriority = 'Medium';
 
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks(); // Load tasks when app starts
+  }
+
+  // Save tasks to device storage
+  Future<void> _saveTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encodedData = jsonEncode(
+      _tasks.map((task) => task.toJson()).toList(),
+    );
+    await prefs.setString('tasks', encodedData);
+  }
+
+  // Load tasks from device storage
+  Future<void> _loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? encodedData = prefs.getString('tasks');
+    if (encodedData != null) {
+      final List<dynamic> decodedData = jsonDecode(encodedData);
+      setState(() {
+        _tasks.addAll(decodedData.map((item) => Task.fromJson(item)));
+      });
+    }
+  }
+
   void _addTask() {
     if (_controller.text.isEmpty) return;
     setState(() {
-      _tasks.add(Task(
-        title: _controller.text,
-        priority: _selectedPriority,
-        createdAt: DateTime.now().toString().substring(0, 16),
-      ));
+      _tasks.add(
+        Task(
+          title: _controller.text,
+          priority: _selectedPriority,
+          createdAt: DateTime.now().toString().substring(0, 16),
+        ),
+      );
       _controller.clear();
       _selectedPriority = 'Medium';
     });
+    _saveTasks(); // Save after adding
     Navigator.pop(context);
   }
 
@@ -65,29 +113,39 @@ class _TodoHomePageState extends State<TodoHomePage> {
     setState(() {
       _tasks[index].isDone = !_tasks[index].isDone;
     });
+    _saveTasks(); // Save after toggling
   }
 
   void _deleteTask(int index) {
     setState(() {
       _tasks.removeAt(index);
     });
+    _saveTasks(); // Save after deleting
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority) {
-      case 'High':   return Colors.red;
-      case 'Medium': return Colors.orange;
-      case 'Low':    return Colors.green;
-      default:       return Colors.orange;
+      case 'High':
+        return Colors.red;
+      case 'Medium':
+        return Colors.orange;
+      case 'Low':
+        return Colors.green;
+      default:
+        return Colors.orange;
     }
   }
 
   String _getPriorityEmoji(String priority) {
     switch (priority) {
-      case 'High':   return '🔴';
-      case 'Medium': return '🟡';
-      case 'Low':    return '🟢';
-      default:       return '🟡';
+      case 'High':
+        return '🔴';
+      case 'Medium':
+        return '🟡';
+      case 'Low':
+        return '🟢';
+      default:
+        return '🟡';
     }
   }
 
@@ -116,7 +174,10 @@ class _TodoHomePageState extends State<TodoHomePage> {
                   return GestureDetector(
                     onTap: () => setDialogState(() => _selectedPriority = p),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: _selectedPriority == p
                             ? _getPriorityColor(p)
@@ -126,7 +187,9 @@ class _TodoHomePageState extends State<TodoHomePage> {
                       child: Text(
                         '${_getPriorityEmoji(p)} $p',
                         style: TextStyle(
-                          color: _selectedPriority == p ? Colors.white : Colors.black,
+                          color: _selectedPriority == p
+                              ? Colors.white
+                              : Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -141,10 +204,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: _addTask,
-              child: const Text('Add Task'),
-            ),
+            ElevatedButton(onPressed: _addTask, child: const Text('Add Task')),
           ],
         ),
       ),
@@ -153,13 +213,15 @@ class _TodoHomePageState extends State<TodoHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    int done    = _tasks.where((t) => t.isDone).length;
+    int done = _tasks.where((t) => t.isDone).length;
     int pending = _tasks.where((t) => !t.isDone).length;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('✅ My To-Do App',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          '✅ My To-Do App',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
@@ -182,9 +244,11 @@ class _TodoHomePageState extends State<TodoHomePage> {
           Expanded(
             child: _tasks.isEmpty
                 ? const Center(
-                    child: Text('No tasks yet!\nTap + to add one 😊',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 18, color: Colors.grey)),
+                    child: Text(
+                      'No tasks yet!\nTap + to add one 😊',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
                   )
                 : ListView.builder(
                     itemCount: _tasks.length,
@@ -192,7 +256,9 @@ class _TodoHomePageState extends State<TodoHomePage> {
                       final task = _tasks[index];
                       return Card(
                         margin: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         child: ListTile(
                           leading: Checkbox(
                             value: task.isDone,
@@ -234,9 +300,14 @@ class _TodoHomePageState extends State<TodoHomePage> {
   Widget _statCard(String label, String value, Color color) {
     return Column(
       children: [
-        Text(value,
-            style: TextStyle(
-                fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
         Text(label, style: const TextStyle(color: Colors.grey)),
       ],
     );
