@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:js' as js;
 
 void main() {
   runApp(const MyApp());
+}
+
+// Save to localStorage using JavaScript
+void webSave(String key, String value) {
+  js.context['localStorage'].callMethod('setItem', [key, value]);
+}
+
+// Load from localStorage using JavaScript
+String? webLoad(String key) {
+  return js.context['localStorage'].callMethod('getItem', [key]);
 }
 
 class MyApp extends StatelessWidget {
@@ -36,7 +46,6 @@ class Task {
     required this.createdAt,
   });
 
-  // Convert Task to JSON
   Map<String, dynamic> toJson() => {
     'title': title,
     'priority': priority,
@@ -44,7 +53,6 @@ class Task {
     'createdAt': createdAt,
   };
 
-  // Convert JSON to Task
   factory Task.fromJson(Map<String, dynamic> json) => Task(
     title: json['title'],
     priority: json['priority'],
@@ -68,27 +76,27 @@ class _TodoHomePageState extends State<TodoHomePage> {
   @override
   void initState() {
     super.initState();
-    _loadTasks(); // Load tasks when app starts
+    _loadTasks();
   }
 
-  // Save tasks to device storage
-  Future<void> _saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _saveTasks() {
     final String encodedData = jsonEncode(
       _tasks.map((task) => task.toJson()).toList(),
     );
-    await prefs.setString('tasks', encodedData);
+    webSave('flutter_tasks', encodedData);
   }
 
-  // Load tasks from device storage
-  Future<void> _loadTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? encodedData = prefs.getString('tasks');
-    if (encodedData != null) {
-      final List<dynamic> decodedData = jsonDecode(encodedData);
-      setState(() {
-        _tasks.addAll(decodedData.map((item) => Task.fromJson(item)));
-      });
+  void _loadTasks() {
+    final String? encodedData = webLoad('flutter_tasks');
+    if (encodedData != null && encodedData.isNotEmpty) {
+      try {
+        final List<dynamic> decodedData = jsonDecode(encodedData);
+        setState(() {
+          _tasks.addAll(decodedData.map((item) => Task.fromJson(item)));
+        });
+      } catch (e) {
+        debugPrint('Error loading tasks: $e');
+      }
     }
   }
 
@@ -105,7 +113,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
       _controller.clear();
       _selectedPriority = 'Medium';
     });
-    _saveTasks(); // Save after adding
+    _saveTasks();
     Navigator.pop(context);
   }
 
@@ -113,14 +121,14 @@ class _TodoHomePageState extends State<TodoHomePage> {
     setState(() {
       _tasks[index].isDone = !_tasks[index].isDone;
     });
-    _saveTasks(); // Save after toggling
+    _saveTasks();
   }
 
   void _deleteTask(int index) {
     setState(() {
       _tasks.removeAt(index);
     });
-    _saveTasks(); // Save after deleting
+    _saveTasks();
   }
 
   Color _getPriorityColor(String priority) {
@@ -227,7 +235,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
       ),
       body: Column(
         children: [
-          // Statistics bar
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.blue.shade50,
@@ -240,7 +247,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
               ],
             ),
           ),
-          // Task list
           Expanded(
             child: _tasks.isEmpty
                 ? const Center(
