@@ -6,12 +6,10 @@ void main() {
   runApp(const MyApp());
 }
 
-// Save to localStorage using JavaScript
 void webSave(String key, String value) {
   js.context['localStorage'].callMethod('setItem', [key, value]);
 }
 
-// Load from localStorage using JavaScript
 String? webLoad(String key) {
   return js.context['localStorage'].callMethod('getItem', [key]);
 }
@@ -71,12 +69,20 @@ class TodoHomePage extends StatefulWidget {
 class _TodoHomePageState extends State<TodoHomePage> {
   final List<Task> _tasks = [];
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   String _selectedPriority = 'Medium';
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    // Listen to search input
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
+    });
   }
 
   void _saveTasks() {
@@ -100,6 +106,14 @@ class _TodoHomePageState extends State<TodoHomePage> {
     }
   }
 
+  // Filter tasks based on search query
+  List<Task> get _filteredTasks {
+    if (_searchQuery.isEmpty) return _tasks;
+    return _tasks
+        .where((task) => task.title.toLowerCase().contains(_searchQuery))
+        .toList();
+  }
+
   void _addTask() {
     if (_controller.text.isEmpty) return;
     setState(() {
@@ -118,15 +132,20 @@ class _TodoHomePageState extends State<TodoHomePage> {
   }
 
   void _toggleTask(int index) {
+    // Find actual task from filtered list
+    final task = _filteredTasks[index];
+    final actualIndex = _tasks.indexOf(task);
     setState(() {
-      _tasks[index].isDone = !_tasks[index].isDone;
+      _tasks[actualIndex].isDone = !_tasks[actualIndex].isDone;
     });
     _saveTasks();
   }
 
   void _deleteTask(int index) {
+    final task = _filteredTasks[index];
+    final actualIndex = _tasks.indexOf(task);
     setState(() {
-      _tasks.removeAt(index);
+      _tasks.removeAt(actualIndex);
     });
     _saveTasks();
   }
@@ -235,6 +254,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
       ),
       body: Column(
         children: [
+          // Statistics bar
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.blue.shade50,
@@ -247,19 +267,63 @@ class _TodoHomePageState extends State<TodoHomePage> {
               ],
             ),
           ),
+
+          // 🔍 Search Bar
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '🔍 Search tasks...',
+                prefixIcon: const Icon(Icons.search, color: Colors.blue),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: const BorderSide(color: Colors.blue, width: 2),
+                ),
+              ),
+            ),
+          ),
+
+          // Search results count
+          if (_searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 16, bottom: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${_filteredTasks.length} result(s) for "$_searchQuery"',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+              ),
+            ),
+
+          // Task list
           Expanded(
-            child: _tasks.isEmpty
-                ? const Center(
+            child: _filteredTasks.isEmpty
+                ? Center(
                     child: Text(
-                      'No tasks yet!\nTap + to add one 😊',
+                      _searchQuery.isNotEmpty
+                          ? '🔍 No tasks found for "$_searchQuery"'
+                          : 'No tasks yet!\nTap + to add one 😊',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                      style: const TextStyle(fontSize: 18, color: Colors.grey),
                     ),
                   )
                 : ListView.builder(
-                    itemCount: _tasks.length,
+                    itemCount: _filteredTasks.length,
                     itemBuilder: (context, index) {
-                      final task = _tasks[index];
+                      final task = _filteredTasks[index];
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 12,
