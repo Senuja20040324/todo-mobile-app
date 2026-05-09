@@ -36,12 +36,14 @@ class Task {
   String priority;
   bool isDone;
   String createdAt;
+  String? dueDate;
 
   Task({
     required this.title,
     required this.priority,
     this.isDone = false,
     required this.createdAt,
+    this.dueDate,
   });
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +51,7 @@ class Task {
     'priority': priority,
     'isDone': isDone,
     'createdAt': createdAt,
+    'dueDate': dueDate,
   };
 
   factory Task.fromJson(Map<String, dynamic> json) => Task(
@@ -56,6 +59,7 @@ class Task {
     priority: json['priority'],
     isDone: json['isDone'],
     createdAt: json['createdAt'],
+    dueDate: json['dueDate'],
   );
 }
 
@@ -72,12 +76,12 @@ class _TodoHomePageState extends State<TodoHomePage> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedPriority = 'Medium';
   String _searchQuery = '';
+  DateTime? _selectedDueDate;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
-    // Listen to search input
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
@@ -106,7 +110,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
     }
   }
 
-  // Filter tasks based on search query
   List<Task> get _filteredTasks {
     if (_searchQuery.isEmpty) return _tasks;
     return _tasks
@@ -118,6 +121,22 @@ class _TodoHomePageState extends State<TodoHomePage> {
         .toList();
   }
 
+  // Get due date status
+  Map<String, dynamic> _getDueStatus(String? dueDate) {
+    if (dueDate == null) return {'text': 'No due date', 'color': Colors.grey};
+    final due = DateTime.parse(dueDate);
+    final today = DateTime.now();
+    final diff = due
+        .difference(DateTime(today.year, today.month, today.day))
+        .inDays;
+
+    if (diff < 0) return {'text': '⚠️ Overdue!', 'color': Colors.red};
+    if (diff == 0) return {'text': '⏰ Due Today!', 'color': Colors.orange};
+    if (diff <= 3)
+      return {'text': '⚡ Due in $diff day(s)', 'color': Colors.amber};
+    return {'text': '📅 ${dueDate.substring(0, 10)}', 'color': Colors.green};
+  }
+
   void _addTask() {
     if (_controller.text.isEmpty) return;
     setState(() {
@@ -126,17 +145,18 @@ class _TodoHomePageState extends State<TodoHomePage> {
           title: _controller.text,
           priority: _selectedPriority,
           createdAt: DateTime.now().toString().substring(0, 16),
+          dueDate: _selectedDueDate?.toString().substring(0, 10),
         ),
       );
       _controller.clear();
       _selectedPriority = 'Medium';
+      _selectedDueDate = null;
     });
     _saveTasks();
     Navigator.pop(context);
   }
 
   void _toggleTask(int index) {
-    // Find actual task from filtered list
     final task = _filteredTasks[index];
     final actualIndex = _tasks.indexOf(task);
     setState(() {
@@ -181,6 +201,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
   }
 
   void _showAddTaskDialog() {
+    _selectedDueDate = null;
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -189,6 +210,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Title
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
@@ -197,6 +219,8 @@ class _TodoHomePageState extends State<TodoHomePage> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // Priority
               const Text('Select Priority:'),
               const SizedBox(height: 8),
               Row(
@@ -227,6 +251,46 @@ class _TodoHomePageState extends State<TodoHomePage> {
                     ),
                   );
                 }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              // Due Date Picker
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedDueDate == null
+                        ? 'No due date'
+                        : '📅 ${_selectedDueDate!.toString().substring(0, 10)}',
+                    style: TextStyle(
+                      color: _selectedDueDate == null
+                          ? Colors.grey
+                          : Colors.blue,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => _selectedDueDate = picked);
+                      }
+                    },
+                    child: const Text('Pick Date'),
+                  ),
+                  if (_selectedDueDate != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () =>
+                          setDialogState(() => _selectedDueDate = null),
+                    ),
+                ],
               ),
             ],
           ),
@@ -272,7 +336,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
             ),
           ),
 
-          // 🔍 Search Bar
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
@@ -283,9 +347,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, color: Colors.grey),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
+                        onPressed: () => _searchController.clear(),
                       )
                     : null,
                 border: OutlineInputBorder(
@@ -299,7 +361,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
             ),
           ),
 
-          // Search results count
           if (_searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 16, bottom: 8),
@@ -328,6 +389,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
                     itemCount: _filteredTasks.length,
                     itemBuilder: (context, index) {
                       final task = _filteredTasks[index];
+                      final dueStatus = _getDueStatus(task.dueDate);
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -349,13 +411,26 @@ class _TodoHomePageState extends State<TodoHomePage> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          subtitle: Text(
-                            '${_getPriorityEmoji(task.priority)} ${task.priority} · ${task.createdAt}',
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_getPriorityEmoji(task.priority)} ${task.priority} · ${task.createdAt}',
+                              ),
+                              Text(
+                                dueStatus['text'],
+                                style: TextStyle(
+                                  color: dueStatus['color'],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () => _deleteTask(index),
                           ),
+                          isThreeLine: true,
                         ),
                       );
                     },
