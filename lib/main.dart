@@ -110,7 +110,11 @@ class _TodoHomePageState extends State<TodoHomePage> {
   List<Task> get _filteredTasks {
     if (_searchQuery.isEmpty) return _tasks;
     return _tasks
-        .where((task) => task.title.toLowerCase().contains(_searchQuery))
+        .where(
+          (task) =>
+              task.title.toLowerCase().contains(_searchQuery) ||
+              task.priority.toLowerCase().contains(_searchQuery),
+        )
         .toList();
   }
 
