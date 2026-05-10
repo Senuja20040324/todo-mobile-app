@@ -27,11 +27,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Load dark mode preference
     final saved = webLoad('dark_mode');
-    if (saved == 'true') {
-      setState(() => _isDarkMode = true);
-    }
+    if (saved == 'true') setState(() => _isDarkMode = true);
   }
 
   void _toggleDarkMode() {
@@ -123,9 +120,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
     super.initState();
     _loadTasks();
     _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
+      setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
   }
 
@@ -197,18 +192,14 @@ class _TodoHomePageState extends State<TodoHomePage> {
   void _toggleTask(int index) {
     final task = _filteredTasks[index];
     final actualIndex = _tasks.indexOf(task);
-    setState(() {
-      _tasks[actualIndex].isDone = !_tasks[actualIndex].isDone;
-    });
+    setState(() => _tasks[actualIndex].isDone = !_tasks[actualIndex].isDone);
     _saveTasks();
   }
 
   void _deleteTask(int index) {
     final task = _filteredTasks[index];
     final actualIndex = _tasks.indexOf(task);
-    setState(() {
-      _tasks.removeAt(actualIndex);
-    });
+    setState(() => _tasks.removeAt(actualIndex));
     _saveTasks();
   }
 
@@ -339,6 +330,14 @@ class _TodoHomePageState extends State<TodoHomePage> {
     );
   }
 
+  // Navigate to Statistics page
+  void _openStatistics() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => StatisticsPage(tasks: _tasks)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     int done = _tasks.where((t) => t.isDone).length;
@@ -353,7 +352,13 @@ class _TodoHomePageState extends State<TodoHomePage> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
-          // 🌙 Dark mode toggle button
+          // Statistics button
+          IconButton(
+            icon: const Icon(Icons.bar_chart, color: Colors.white),
+            onPressed: _openStatistics,
+            tooltip: 'Statistics',
+          ),
+          // Dark mode toggle
           IconButton(
             icon: Icon(
               widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
@@ -366,7 +371,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
       ),
       body: Column(
         children: [
-          // Statistics bar
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.blue.shade50.withOpacity(
@@ -381,8 +385,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
               ],
             ),
           ),
-
-          // Search Bar
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
@@ -406,7 +408,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
               ),
             ),
           ),
-
           if (_searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 16, bottom: 8),
@@ -418,8 +419,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
                 ),
               ),
             ),
-
-          // Task list
           Expanded(
             child: _filteredTasks.isEmpty
                 ? Center(
@@ -504,6 +503,278 @@ class _TodoHomePageState extends State<TodoHomePage> {
           ),
         ),
         Text(label, style: const TextStyle(color: Colors.grey)),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// 📊 STATISTICS PAGE
+// ─────────────────────────────────────────
+class StatisticsPage extends StatelessWidget {
+  final List<Task> tasks;
+  const StatisticsPage({super.key, required this.tasks});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = tasks.length;
+    final done = tasks.where((t) => t.isDone).length;
+    final pending = total - done;
+    final high = tasks.where((t) => t.priority == 'High').length;
+    final medium = tasks.where((t) => t.priority == 'Medium').length;
+    final low = tasks.where((t) => t.priority == 'Low').length;
+    final percent = total > 0 ? (done / total * 100).toInt() : 0;
+
+    final today = DateTime.now();
+    final overdue = tasks
+        .where(
+          (t) =>
+              t.dueDate != null &&
+              !t.isDone &&
+              DateTime.parse(
+                t.dueDate!,
+              ).isBefore(DateTime(today.year, today.month, today.day)),
+        )
+        .length;
+    final dueToday = tasks
+        .where(
+          (t) =>
+              t.dueDate != null &&
+              !t.isDone &&
+              DateTime.parse(
+                t.dueDate!,
+              ).isAtSameMomentAs(DateTime(today.year, today.month, today.day)),
+        )
+        .length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          '📊 Statistics',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Progress Card
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '🎯 Overall Progress',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: total > 0 ? done / total : 0,
+                        minHeight: 20,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.green,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$percent% Complete ($done of $total tasks done)',
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Task Count Cards
+            const Text(
+              '📋 Task Overview',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _countCard('Total', total, Colors.blue, Icons.list),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _countCard(
+                    'Done',
+                    done,
+                    Colors.green,
+                    Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _countCard(
+                    'Pending',
+                    pending,
+                    Colors.orange,
+                    Icons.pending,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Priority Cards
+            const Text(
+              '🎯 By Priority',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _countCard(
+                    '🔴 High',
+                    high,
+                    Colors.red,
+                    Icons.priority_high,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _countCard(
+                    '🟡 Medium',
+                    medium,
+                    Colors.orange,
+                    Icons.remove,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _countCard(
+                    '🟢 Low',
+                    low,
+                    Colors.green,
+                    Icons.low_priority,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Due Date Cards
+            const Text(
+              '📅 Due Dates',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _countCard(
+                    '⚠️ Overdue',
+                    overdue,
+                    Colors.red,
+                    Icons.warning,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _countCard(
+                    '⏰ Today',
+                    dueToday,
+                    Colors.orange,
+                    Icons.today,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Priority Progress bars
+            const Text(
+              '📊 Priority Breakdown',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    _priorityBar('🔴 High', high, total, Colors.red),
+                    const SizedBox(height: 12),
+                    _priorityBar('🟡 Medium', medium, total, Colors.orange),
+                    const SizedBox(height: 12),
+                    _priorityBar('🟢 Low', low, total, Colors.green),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _countCard(String label, int value, Color color, IconData icon) {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 30),
+            const SizedBox(height: 8),
+            Text(
+              value.toString(),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _priorityBar(String label, int count, int total, Color color) {
+    final percent = total > 0 ? count / total : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('$count tasks', style: const TextStyle(color: Colors.grey)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+            value: percent.toDouble(),
+            minHeight: 12,
+            backgroundColor: Colors.grey.shade200,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
       ],
     );
   }
