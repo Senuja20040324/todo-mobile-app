@@ -203,6 +203,132 @@ class _TodoHomePageState extends State<TodoHomePage> {
     _saveTasks();
   }
 
+  void _editTask(int index) {
+    final task = _filteredTasks[index];
+    final actualIndex = _tasks.indexOf(task);
+    final TextEditingController editController = TextEditingController(
+      text: task.title,
+    );
+    String editPriority = task.priority;
+    DateTime? editDueDate = task.dueDate != null
+        ? DateTime.parse(task.dueDate!)
+        : null;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('✏️ Edit Task'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title
+              TextField(
+                controller: editController,
+                decoration: const InputDecoration(
+                  hintText: 'Edit task title...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Priority
+              const Text('Select Priority:'),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ['High', 'Medium', 'Low'].map((p) {
+                  return GestureDetector(
+                    onTap: () => setDialogState(() => editPriority = p),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: editPriority == p
+                            ? _getPriorityColor(p)
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_getPriorityEmoji(p)} $p',
+                        style: TextStyle(
+                          color: editPriority == p
+                              ? Colors.white
+                              : Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              // Due Date
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text(
+                    editDueDate == null
+                        ? 'No due date'
+                        : '📅 ${editDueDate!.toString().substring(0, 10)}',
+                    style: TextStyle(
+                      color: editDueDate == null ? Colors.grey : Colors.blue,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: editDueDate ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => editDueDate = picked);
+                      }
+                    },
+                    child: const Text('Pick Date'),
+                  ),
+                  if (editDueDate != null)
+                    IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () => setDialogState(() => editDueDate = null),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (editController.text.isEmpty) return;
+                setState(() {
+                  _tasks[actualIndex].title = editController.text;
+                  _tasks[actualIndex].priority = editPriority;
+                  _tasks[actualIndex].dueDate = editDueDate
+                      ?.toString()
+                      .substring(0, 10);
+                });
+                _saveTasks();
+                Navigator.pop(context);
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'High':
@@ -471,9 +597,24 @@ class _TodoHomePageState extends State<TodoHomePage> {
                               ),
                             ],
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteTask(index),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.blue,
+                                ),
+                                onPressed: () => _editTask(index),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _deleteTask(index),
+                              ),
+                            ],
                           ),
                           isThreeLine: true,
                         ),
