@@ -14,19 +14,52 @@ String? webLoad(String key) {
   return js.context['localStorage'].callMethod('getItem', [key]);
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isDarkMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load dark mode preference
+    final saved = webLoad('dark_mode');
+    if (saved == 'true') {
+      setState(() => _isDarkMode = true);
+    }
+  }
+
+  void _toggleDarkMode() {
+    setState(() => _isDarkMode = !_isDarkMode);
+    webSave('dark_mode', _isDarkMode.toString());
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'To-Do App',
       debugShowCheckedModeBanner: false,
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const TodoHomePage(),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: TodoHomePage(
+        isDarkMode: _isDarkMode,
+        onToggleDarkMode: _toggleDarkMode,
+      ),
     );
   }
 }
@@ -64,7 +97,14 @@ class Task {
 }
 
 class TodoHomePage extends StatefulWidget {
-  const TodoHomePage({super.key});
+  final bool isDarkMode;
+  final VoidCallback onToggleDarkMode;
+
+  const TodoHomePage({
+    super.key,
+    required this.isDarkMode,
+    required this.onToggleDarkMode,
+  });
 
   @override
   State<TodoHomePage> createState() => _TodoHomePageState();
@@ -121,7 +161,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
         .toList();
   }
 
-  // Get due date status
   Map<String, dynamic> _getDueStatus(String? dueDate) {
     if (dueDate == null) return {'text': 'No due date', 'color': Colors.grey};
     final due = DateTime.parse(dueDate);
@@ -129,7 +168,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
     final diff = due
         .difference(DateTime(today.year, today.month, today.day))
         .inDays;
-
     if (diff < 0) return {'text': '⚠️ Overdue!', 'color': Colors.red};
     if (diff == 0) return {'text': '⏰ Due Today!', 'color': Colors.orange};
     if (diff <= 3)
@@ -210,7 +248,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Title
               TextField(
                 controller: _controller,
                 decoration: const InputDecoration(
@@ -219,8 +256,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Priority
               const Text('Select Priority:'),
               const SizedBox(height: 8),
               Row(
@@ -253,8 +288,6 @@ class _TodoHomePageState extends State<TodoHomePage> {
                 }).toList(),
               ),
               const SizedBox(height: 16),
-
-              // Due Date Picker
               Row(
                 children: [
                   const Icon(Icons.calendar_today, color: Colors.blue),
@@ -319,13 +352,26 @@ class _TodoHomePageState extends State<TodoHomePage> {
         ),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          // 🌙 Dark mode toggle button
+          IconButton(
+            icon: Icon(
+              widget.isDarkMode ? Icons.wb_sunny : Icons.nightlight_round,
+              color: Colors.white,
+            ),
+            onPressed: widget.onToggleDarkMode,
+            tooltip: widget.isDarkMode ? 'Light Mode' : 'Dark Mode',
+          ),
+        ],
       ),
       body: Column(
         children: [
           // Statistics bar
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.blue.shade50,
+            color: Colors.blue.shade50.withOpacity(
+              widget.isDarkMode ? 0.1 : 1.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -407,7 +453,7 @@ class _TodoHomePageState extends State<TodoHomePage> {
                               decoration: task.isDone
                                   ? TextDecoration.lineThrough
                                   : null,
-                              color: task.isDone ? Colors.grey : Colors.black,
+                              color: task.isDone ? Colors.grey : null,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
