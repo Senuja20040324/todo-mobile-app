@@ -67,6 +67,7 @@ class Task {
   bool isDone;
   String createdAt;
   String? dueDate;
+  String category;
 
   Task({
     required this.title,
@@ -74,6 +75,7 @@ class Task {
     this.isDone = false,
     required this.createdAt,
     this.dueDate,
+    this.category = 'Personal',
   });
 
   Map<String, dynamic> toJson() => {
@@ -82,6 +84,7 @@ class Task {
     'isDone': isDone,
     'createdAt': createdAt,
     'dueDate': dueDate,
+    'category': category,
   };
 
   factory Task.fromJson(Map<String, dynamic> json) => Task(
@@ -90,6 +93,7 @@ class Task {
     isDone: json['isDone'],
     createdAt: json['createdAt'],
     dueDate: json['dueDate'],
+    category: json['category'] ?? '👤 Personal',
   );
 }
 
@@ -114,6 +118,18 @@ class _TodoHomePageState extends State<TodoHomePage> {
   String _selectedPriority = 'Medium';
   String _searchQuery = '';
   DateTime? _selectedDueDate;
+  String _selectedCategory = '👤 Personal';
+  String _filterCategory = 'All';
+
+  final List<String> _categories = [
+    'All',
+    '💼 Work',
+    '👤 Personal',
+    '📚 Study',
+    '🏃 Health',
+    '🛒 Shopping',
+    '💰 Finance',
+  ];
 
   @override
   void initState() {
@@ -146,14 +162,28 @@ class _TodoHomePageState extends State<TodoHomePage> {
   }
 
   List<Task> get _filteredTasks {
-    if (_searchQuery.isEmpty) return _tasks;
-    return _tasks
-        .where(
-          (task) =>
-              task.title.toLowerCase().contains(_searchQuery) ||
-              task.priority.toLowerCase().contains(_searchQuery),
-        )
-        .toList();
+    List<Task> filtered = _tasks;
+
+    // Filter by category
+    if (_filterCategory != 'All') {
+      filtered = filtered
+          .where((task) => task.category == _filterCategory)
+          .toList();
+    }
+
+    // Filter by search
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (task) =>
+                task.title.toLowerCase().contains(_searchQuery) ||
+                task.priority.toLowerCase().contains(_searchQuery) ||
+                task.category.toLowerCase().contains(_searchQuery),
+          )
+          .toList();
+    }
+
+    return filtered;
   }
 
   Map<String, dynamic> _getDueStatus(String? dueDate) {
@@ -179,11 +209,13 @@ class _TodoHomePageState extends State<TodoHomePage> {
           priority: _selectedPriority,
           createdAt: DateTime.now().toString().substring(0, 16),
           dueDate: _selectedDueDate?.toString().substring(0, 10),
+          category: _selectedCategory,
         ),
       );
       _controller.clear();
       _selectedPriority = 'Medium';
       _selectedDueDate = null;
+      _selectedCategory = '👤 Personal';
     });
     _saveTasks();
     Navigator.pop(context);
@@ -266,7 +298,44 @@ class _TodoHomePageState extends State<TodoHomePage> {
               ),
               const SizedBox(height: 16),
 
-              // Due Date
+              // Category selector
+              const Text('Select Category:'),
+              const SizedBox(height: 8),
+              StatefulBuilder(
+                builder: (context, setCatState) =>
+                    DropdownButtonFormField<String>(
+                      value: _selectedCategory,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      items:
+                          [
+                                '💼 Work',
+                                '👤 Personal',
+                                '📚 Study',
+                                '🏃 Health',
+                                '🛒 Shopping',
+                                '💰 Finance',
+                              ]
+                              .map(
+                                (cat) => DropdownMenuItem(
+                                  value: cat,
+                                  child: Text(cat),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedCategory = val);
+                        }
+                      },
+                    ),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   const Icon(Icons.calendar_today, color: Colors.blue),
@@ -405,6 +474,40 @@ class _TodoHomePageState extends State<TodoHomePage> {
                 }).toList(),
               ),
               const SizedBox(height: 16),
+
+              // Category selector
+              const Text('Select Category:'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                items:
+                    [
+                          '💼 Work',
+                          '👤 Personal',
+                          '📚 Study',
+                          '🏃 Health',
+                          '🛒 Shopping',
+                          '💰 Finance',
+                        ]
+                        .map(
+                          (cat) =>
+                              DropdownMenuItem(value: cat, child: Text(cat)),
+                        )
+                        .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() => _selectedCategory = val);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   const Icon(Icons.calendar_today, color: Colors.blue),
@@ -534,6 +637,45 @@ class _TodoHomePageState extends State<TodoHomePage> {
               ),
             ),
           ),
+
+          // Category filter bar
+          SizedBox(
+            height: 50,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                final isSelected = _filterCategory == cat;
+                return GestureDetector(
+                  onTap: () => setState(() => _filterCategory = cat),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.blue : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      cat,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+
           if (_searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 16, bottom: 8),
@@ -586,7 +728,14 @@ class _TodoHomePageState extends State<TodoHomePage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_getPriorityEmoji(task.priority)} ${task.priority} · ${task.createdAt}',
+                                '${_getPriorityEmoji(task.priority)} ${task.priority} · ${task.category}',
+                              ),
+                              Text(
+                                task.createdAt,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
                               ),
                               Text(
                                 dueStatus['text'],
